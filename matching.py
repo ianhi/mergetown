@@ -45,3 +45,46 @@ def match_within_group(indep,dep,matching_cols,metric='mahalanobis',VI=None,p=No
         for i,v in enumerate(new_cols):
             d_dat[new_cols[i]]=i_dat[v].values[idx]
         return d_dat
+def gen_fake_data(N=100,n_match=4,countries=[0,1,2],noise_fraction=.2):
+    """
+    currently assumes gender as a binary as that is what most of maleah's data does
+    but i feel bad about baking that in :(
+    """
+    matching = np.random.randn(N,n_match)
+    matching_cols = [f'match{i}' for i in range(n_match)]
+
+
+    gender = np.random.choice([0,1],N,replace=True).astype(np.bool)
+    country = np.random.choice(countries,N,replace=True)
+
+    exact_cols = ['country','gender']
+    exacts = np.hstack([country[:,None],gender[:,None]])
+
+
+    X = np.random.randn(N)
+
+    m = 5
+    sigma = 2
+    slope_men  =10
+    slope_women = 3
+
+#     noise_fraction = .2
+    n_men = gender.sum()
+    Y = np.zeros_like(X)
+    
+    Y[gender] = slope_men*X[gender] + np.random.randn(n_men)*sigma
+    Y[~gender] = slope_women*X[~gender] + np.random.randn(N-n_men)*sigma
+
+    matching_noise = np.random.randn(N,n_match)*noise_fraction
+    indep = pd.DataFrame(np.hstack([matching+matching_noise,exacts,X[:,None]])) #,identity[:,None]
+    indep.columns =matching_cols+exact_cols+['indep']#,'identity']
+
+
+    dep = pd.DataFrame(np.hstack([matching,exacts,Y[:,None]])) #,identity[:,None]
+    dep.columns = matching_cols+exact_cols+['dep']#,'identity']
+
+
+    #shuffle indep
+
+    indep = shuffle(indep)
+    return indep,dep

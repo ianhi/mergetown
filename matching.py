@@ -138,3 +138,18 @@ def match_within_group(onto,source,matching_cols,metric='mahalanobis',VI=None,p=
         onto_dat[new_cols[i]]=source_dat[v].values[idx]
     onto_dat['dist']=dist
     return onto_dat
+def matching(onto,source,matching_cols,exact_cols=None,metric = 'mahalanobis'):
+    if exact_cols is None:
+        print("not doing exact matching")
+        return match_within_group(onto,source,matching_cols,metric=metric)
+    else:
+        out = []
+        onto_group = indep.groupby(exact_cols)
+        source_group = source.groupby(exact_cols)
+        for key in source_group.groups.keys():
+            source_dat = source.loc[source_group.groups[key],:]
+            onto_dat = onto.loc[onto_group.groups[key],:]
+            out.append(match_within_group(onto_dat,source_dat,matching_cols,metric=metric))
+        
+        #https://stackoverflow.com/questions/50501787/python-pandas-user-warning-sorting-because-non-concatenation-axis-is-not-aligne
+        return pd.concat(out,sort=False)

@@ -1,7 +1,11 @@
 import pandas as pd
 import numpy as np
 from scipy.spatial.distance import cdist
-
+from sklearn.utils import shuffle
+def get_nearest(pairwise):
+    nearest_idx = pairwise.argmin(axis=1)
+    dists = pairwise[np.arange(pairwise.shape[0]),nearest_idx]
+    return nearest_idx,dists
 def _match_within_group(x1,x2,metric='mahalanobis',VI=None,p=None):
     """
     returns the indexto match x2 to x1 and some other stuff
@@ -12,7 +16,27 @@ def _match_within_group(x1,x2,metric='mahalanobis',VI=None,p=None):
     
     return idx,dist,pairwise
 
-def match_within_group(indep,dep,matching_cols,metric='mahalanobis',VI=None,p=None):
+# def _match_within_group(onto,source,metric='mahalanobis',VI=None,p=None):
+#     """
+#     matches the entries in source onto the entries in onto. so the final size is never bigger than the onto dataframe
+    
+#     """
+#     onto = onto.copy()
+#     onto_arr = onto.values
+#     source_arr = source.values
+#     pairwise = cdist(onto_arr,source_arr,metric=metric,VI=None,p=None)
+#     idx, dist = get_nearest(pairwise)
+    
+    
+#     new_cols = np.setdiff1d(source.columns,onto.columns)
+#     for i,v in enumerate(new_cols):
+#         onto[new_cols[i]]=source[v].values[idx]
+#     onto['dist']=dist
+
+#     return onto
+    
+
+def match_within_group_old(indep,dep,matching_cols,metric='mahalanobis',VI=None,p=None):
     
     """
     do 1 to 1 matching with with the given metric
@@ -31,19 +55,23 @@ def match_within_group(indep,dep,matching_cols,metric='mahalanobis',VI=None,p=No
     
     d_arr = dep[matching_cols].values
     d_dat = dep.drop(matching_cols,axis=1)
-        
+
     if i_arr.shape[0]<d_arr.shape[0]:
         idx,dist,_ = _match_within_group(i_arr,d_arr,metric=metric,VI=VI,p=p)
         new_cols = np.setdiff1d(d_dat.columns,i_dat.columns)
-        
-        for i in new_cols:
-            i_dat[new_cols]=d_dat[i].values[idx]
+        for i,v in enumerate(new_cols):
+            
+            i_dat[new_cols[i]]=d_dat[v].values[idx]
+        i_dat['dist']=dist
+
         return i_dat
     else:
         idx,dist,_ = _match_within_group(d_arr,i_arr,metric=metric,VI=VI,p=p)
         new_cols = np.setdiff1d(i_dat.columns,d_dat.columns)
         for i,v in enumerate(new_cols):
             d_dat[new_cols[i]]=i_dat[v].values[idx]
+        
+        d_dat['dist']=dist
         return d_dat
 def gen_fake_data(N=100,n_match=4,countries=[0,1,2],noise_fraction=.2):
     """
@@ -87,4 +115,26 @@ def gen_fake_data(N=100,n_match=4,countries=[0,1,2],noise_fraction=.2):
     #shuffle indep
 
     indep = shuffle(indep)
-    return indep,dep
+    
+    true_df = pd.DataFrame(np.hstack([matching,exacts,X[:,None],Y[:,None]])  )
+    true_df.columns = matching_cols+exact_cols+['indep','dep']
+    true_df[exact_cols+['indep','dep']].groupby(exact_cols).mean()
+    return indep,dep,true_df,matching_cols,exact_cols
+def match_within_group(onto,source,matching_cols,metric='mahalanobis',VI=None,p=None):
+    """
+    matches the data from source and appends into the onto dataframe
+    """
+    onto_arr = onto[matching_cols].values
+    onto_dat = onto.drop(matching_cols,axis=1)
+
+    source_arr = source[matching_cols].values
+    source_dat = source.drop(matching_cols,axis=1)
+    
+    pairwise = cdist(onto_arr,source_arr,metric=metric,VI=None,p=None)
+    idx, dist = get_nearest(pairwise)
+    
+    new_cols = np.setdiff1d(source_dat.columns,onto_dat.columns)
+    for i,v in enumerate(new_cols):
+        onto_dat[new_cols[i]]=source_dat[v].values[idx]
+    onto_dat['dist']=dist
+    return onto_dat
